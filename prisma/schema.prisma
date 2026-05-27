@@ -1,0 +1,131 @@
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  CUSTOMER
+  ADMIN
+}
+
+enum ProductStatus {
+  ACTIVE
+  DRAFT
+  OUT_OF_STOCK
+}
+
+enum OrderStatus {
+  PENDING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+model User {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  email     String   @unique
+  name      String?
+  password  String
+  role      Role     @default(CUSTOMER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  orders    Order[]
+  reviews   Review[]
+}
+
+model Category {
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  slug        String    @unique
+  description String?
+  imageUrl    String?
+  isActive    Boolean   @default(true)
+  watches     Watch[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Watch {
+  id           String        @id @default(auto()) @map("_id") @db.ObjectId
+  sku          String        @unique
+  name         String
+  brand        String
+  model        String
+  price        Float
+  stock        Int           @default(0)
+  status       ProductStatus @default(ACTIVE)
+  description  String
+  thumbnailUrl String
+  amazonUrl    String?
+  flipkartUrl  String?
+  meeshoUrl    String?
+  isDeleted    Boolean       @default(false)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  categoryId   String        @db.ObjectId
+  category     Category      @relation(fields: [categoryId], references: [id])
+  images       WatchImage[]
+  reviews      Review[]
+  orderItems   OrderItem[]
+}
+
+model WatchImage {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  watchId   String   @db.ObjectId
+  watch     Watch    @relation(fields: [watchId], references: [id], onDelete: Cascade)
+  imageUrl  String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+}
+
+model Review {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  watchId   String   @db.ObjectId
+  watch     Watch    @relation(fields: [watchId], references: [id], onDelete: Cascade)
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id])
+  rating    Int
+  comment   String
+  isApproved Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Order {
+  id         String      @id @default(auto()) @map("_id") @db.ObjectId
+  userId     String      @db.ObjectId
+  user       User        @relation(fields: [userId], references: [id])
+  items      OrderItem[]
+  total      Float
+  status     OrderStatus @default(PENDING)
+  address    String
+  phone      String
+  trackingId String?
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+}
+
+model OrderItem {
+  id       String @id @default(auto()) @map("_id") @db.ObjectId
+  orderId  String @db.ObjectId
+  order    Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  watchId  String @db.ObjectId
+  watch     Watch    @relation(fields: [watchId], references: [id])
+  quantity Int
+  price    Float
+}
+
+model Coupon {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  code       String   @unique
+  discount   Float    // Percentage (e.g. 15 for 15% off)
+  minSpend   Float    @default(0)
+  isActive   Boolean  @default(true)
+  validUntil DateTime
+  createdAt  DateTime @default(now())
+}
+

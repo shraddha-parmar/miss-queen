@@ -1,0 +1,95 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary-dark: #0B0B0C;
+  --color-soft-black: #121214;
+  --color-gold-accent: #C6A95E;
+  --color-accent: #C6A95E;
+  --color-pure-white: #FFFFFF;
+  --color-text-muted: #8C8C9A;
+  --color-text-secondary: #5C5C6A;
+  --color-border: #E5E5EA;
+  --color-soft-bg: #F5F5F7;
+  
+  --font-sans: var(--font-montserrat), sans-serif;
+  --font-heading: var(--font-cormorant), serif;
+  --font-cormorant: var(--font-cormorant), serif;
+  --font-cinzel: var(--font-cinzel), serif;
+  --font-montserrat: var(--font-montserrat), sans-serif;
+  --font-inter: var(--font-inter), sans-serif;
+
+  --shadow-luxury: 0 30px 60px -15px rgba(198, 169, 94, 0.12);
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+:root {
+  --bg-main: #FFFFFF;
+  --text-primary: #121214;
+  --text-secondary: #5C5C6A;
+  --text-muted: #8C8C9A;
+  --border: #E5E5EA;
+  --soft-bg: #F5F5F7;
+}
+
+body {
+  background: var(--bg-main);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+}
+
+/* Custom transitions and scrollbars */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #E5E5EA;
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #C6A95E;
+}
+
+/* Button & Card Utilities */
+.btn {
+  @apply inline-flex items-center justify-center font-bold tracking-widest uppercase text-xs transition-all duration-300;
+}
+
+.btn-primary {
+  @apply bg-primary-dark text-white border border-primary-dark hover:bg-gold-accent hover:border-gold-accent hover:text-primary-dark;
+}
+
+.btn-accent {
+  @apply bg-gold-accent text-primary-dark border border-gold-accent hover:bg-white hover:border-gold-accent;
+}
+
+.btn-secondary {
+  @apply bg-transparent text-primary-dark border border-primary-dark/20 hover:border-primary-dark;
+}
+
+.btn-danger {
+  @apply bg-red-600 text-white border border-red-600 hover:bg-red-700 hover:border-red-700;
+}
+
+/* Card layout wrapper */
+.card {
+  @apply bg-white border border-border p-6 rounded-2xl shadow-sm transition-all duration-300 hover:shadow-md;
+}
+
+/* Skeleton animation */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .5; }
+}
+
+.skeleton {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  @apply bg-zinc-200/80 dark:bg-zinc-800/80;
+}
+
