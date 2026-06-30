@@ -1,5 +1,5 @@
 datasource db {
-  provider = "mongodb"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -26,7 +26,7 @@ enum OrderStatus {
 }
 
 model User {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  id        String   @id @default(uuid())
   email     String   @unique
   name      String?
   password  String
@@ -38,7 +38,7 @@ model User {
 }
 
 model Category {
-  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  id          String    @id @default(uuid())
   name        String
   slug        String    @unique
   description String?
@@ -50,7 +50,7 @@ model Category {
 }
 
 model Watch {
-  id           String        @id @default(auto()) @map("_id") @db.ObjectId
+  id           String        @id @default(uuid())
   sku          String        @unique
   name         String
   brand        String
@@ -66,7 +66,7 @@ model Watch {
   isDeleted    Boolean       @default(false)
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
-  categoryId   String        @db.ObjectId
+  categoryId   String
   category     Category      @relation(fields: [categoryId], references: [id])
   images       WatchImage[]
   reviews      Review[]
@@ -74,8 +74,8 @@ model Watch {
 }
 
 model WatchImage {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  watchId   String   @db.ObjectId
+  id        String   @id @default(uuid())
+  watchId   String
   watch     Watch    @relation(fields: [watchId], references: [id], onDelete: Cascade)
   imageUrl  String
   sortOrder Int      @default(0)
@@ -83,10 +83,10 @@ model WatchImage {
 }
 
 model Review {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  watchId   String   @db.ObjectId
+  id        String   @id @default(uuid())
+  watchId   String
   watch     Watch    @relation(fields: [watchId], references: [id], onDelete: Cascade)
-  userId    String   @db.ObjectId
+  userId    String
   user      User     @relation(fields: [userId], references: [id])
   rating    Int
   comment   String
@@ -96,8 +96,8 @@ model Review {
 }
 
 model Order {
-  id         String      @id @default(auto()) @map("_id") @db.ObjectId
-  userId     String      @db.ObjectId
+  id         String      @id @default(uuid())
+  userId     String
   user       User        @relation(fields: [userId], references: [id])
   items      OrderItem[]
   total      Float
@@ -110,17 +110,17 @@ model Order {
 }
 
 model OrderItem {
-  id       String @id @default(auto()) @map("_id") @db.ObjectId
-  orderId  String @db.ObjectId
+  id       String @id @default(uuid())
+  orderId  String
   order    Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  watchId  String @db.ObjectId
-  watch     Watch    @relation(fields: [watchId], references: [id])
+  watchId  String
+  watch    Watch  @relation(fields: [watchId], references: [id])
   quantity Int
   price    Float
 }
 
 model Coupon {
-  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  id         String   @id @default(uuid())
   code       String   @unique
   discount   Float    // Percentage (e.g. 15 for 15% off)
   minSpend   Float    @default(0)
@@ -128,4 +128,3 @@ model Coupon {
   validUntil DateTime
   createdAt  DateTime @default(now())
 }
-

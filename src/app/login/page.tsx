@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { signIn } from "next-auth/react";
 import { Lock, Mail, ArrowRight, Eye, EyeOff } from "lucide-react";
 import Header from "@/components/storefront/Header";
 import Footer from "@/components/storefront/Footer";
@@ -15,23 +15,40 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setIsLoading(true);
 
-    // Mock validation to allow direct exploration of the Admin Panel
-    setTimeout(() => {
-      if (email.trim() === "admin@missqueen.com" && password === "password123") {
-        router.push("/admin/dashboard");
-      } else if (email && password) {
-        // Mock successful regular user login
-        router.push("/");
-      } else {
-        setError("Please enter your Vault credentials.");
+    try {
+      const result = await signIn("credentials", {
+        email: email.trim().toLowerCase(),
+        password,
+        redirect: false,
+      });
+
+      if (result?.error) {
+        setError(result.error === "CredentialsSignin"
+          ? "Invalid email or password. Please try again."
+          : result.error
+        );
+      } else if (result?.ok) {
+        // Check if admin to redirect to admin dashboard
+        const res = await fetch("/api/auth/session");
+        const session = await res.json();
+
+        if (session?.user?.role === "ADMIN") {
+          router.push("/admin/dashboard");
+        } else {
+          router.push("/");
+        }
+        router.refresh();
       }
+    } catch {
+      setError("Something went wrong. Please try again.");
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   return (

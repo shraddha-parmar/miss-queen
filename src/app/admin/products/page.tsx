@@ -1,9 +1,10 @@
-import { getWatches } from "@/lib/watches";
+import { getWatches, getCategories } from "@/lib/watches";
 import ProductsClient from "./ProductsClient";
 
 export default async function AdminProductsPage() {
-  // Fetch initial list of watches (set high limit to fetch all)
+  // Fetch initial list of watches and categories
   const { items: initialWatches } = await getWatches({ limit: 100 });
+  const categories = await getCategories();
 
   return (
     <div className="space-y-8">
@@ -20,7 +21,7 @@ export default async function AdminProductsPage() {
       </div>
 
       {/* Main Client Table & CRUD controls */}
-      <ProductsClient initialWatches={initialWatches} />
+      <ProductsClient initialWatches={initialWatches} categories={categories} />
     </div>
   );
 }

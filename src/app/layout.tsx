@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Montserrat, Cormorant_Garamond, Cinzel, Inter } from "next/font/google";
+import AuthProvider from "@/components/AuthProvider";
 import "./globals.css";
 
 const montserrat = Montserrat({
@@ -43,7 +44,9 @@ export default function RootLayout({
       className={`${montserrat.variable} ${cormorant.variable} ${cinzel.variable} ${inter.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-white overflow-x-hidden font-sans">
-        {children}
+        <AuthProvider>
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );

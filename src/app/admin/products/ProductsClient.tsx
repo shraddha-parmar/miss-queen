@@ -1,7 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Search, Trash2, Edit2, X, AlertCircle } from "lucide-react";
+import { Plus, Search, Trash2, Edit2, X, AlertCircle, Loader2 } from "lucide-react";
+
+interface CategoryItem {
+  id: string;
+  name: string;
+  slug: string;
+}
 
 interface WatchItem {
   id: string;
@@ -17,17 +23,20 @@ interface WatchItem {
   amazonUrl: string | null;
   flipkartUrl: string | null;
   meeshoUrl: string | null;
+  categoryId?: string;
 }
 
 interface ProductsClientProps {
   initialWatches: WatchItem[];
+  categories: CategoryItem[];
 }
 
-export default function ProductsClient({ initialWatches }: ProductsClientProps) {
+export default function ProductsClient({ initialWatches, categories }: ProductsClientProps) {
   const [watches, setWatches] = useState<WatchItem[]>(initialWatches);
   const [search, setSearch] = useState("");
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingWatch, setEditingWatch] = useState<WatchItem | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   // Form Fields
   const [sku, setSku] = useState("");
@@ -42,6 +51,7 @@ export default function ProductsClient({ initialWatches }: ProductsClientProps) 
   const [amazonUrl, setAmazonUrl] = useState("");
   const [flipkartUrl, setFlipkartUrl] = useState("");
   const [meeshoUrl, setMeeshoUrl] = useState("");
+  const [categoryId, setCategoryId] = useState("");
 
   const handleOpenAddForm = () => {
     setEditingWatch(null);
@@ -57,6 +67,8 @@ export default function ProductsClient({ initialWatches }: ProductsClientProps) 
     setAmazonUrl("");
     setFlipkartUrl("");
     setMeeshoUrl("");
+    // Default to the first category if available
+    setCategoryId(categories.length > 0 ? categories[0].id : "");
     setIsFormOpen(true);
   };
 
@@ -74,45 +86,41 @@ export default function ProductsClient({ initialWatches }: ProductsClientProps) 
     setAmazonUrl(watch.amazonUrl || "");
     setFlipkartUrl(watch.flipkartUrl || "");
     setMeeshoUrl(watch.meeshoUrl || "");
+    setCategoryId(watch.categoryId || "");
     setIsFormOpen(true);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm("Are you sure you want to remove this timepiece from the active catalog?")) {
-      setWatches(watches.filter((w) => w.id !== id));
+      try {
+        const res = await fetch(`/api/admin/products/${id}`, {
+          method: "DELETE",
+        });
+        
+        if (!res.ok) {
+          const resData = await res.json();
+          throw new Error(resData.error || "Failed to delete product");
+        }
+        
+        setWatches(watches.filter((w) => w.id !== id));
+      } catch (err: any) {
+        alert(err.message || "Failed to delete watch.");
+      }
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (editingWatch) {
-      // Update existing
-      setWatches(
-        watches.map((w) =>
-          w.id === editingWatch.id
-            ? {
-                ...w,
-                sku,
-                name,
-                brand,
-                model,
-                price: parseFloat(price),
-                stock: parseInt(stock),
-                status,
-                description,
-                thumbnailUrl,
-                amazonUrl: amazonUrl || null,
-                flipkartUrl: flipkartUrl || null,
-                meeshoUrl: meeshoUrl || null,
-              }
-            : w
-        )
-      );
-    } else {
-      // Add new
-      const newWatch: WatchItem = {
-        id: Math.random().toString(36).substr(2, 9),
+    if (!categoryId) {
+      alert("Please select a collection category.");
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      
+      const payload = {
         sku,
         name,
         brand,
@@ -125,11 +133,53 @@ export default function ProductsClient({ initialWatches }: ProductsClientProps) 
         amazonUrl: amazonUrl || null,
         flipkartUrl: flipkartUrl || null,
         meeshoUrl: meeshoUrl || null,
+        categoryId,
       };
-      setWatches([newWatch, ...watches]);
-    }
 
-    setIsFormOpen(false);
+      if (editingWatch) {
+        // Edit watch API request
+        const res = await fetch(`/api/admin/products/${editingWatch.id}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        });
+        
+        const resData = await res.json();
+        if (!res.ok) {
+          throw new Error(resData.error || "Failed to save product changes");
+        }
+
+        setWatches(
+          watches.map((w) =>
+            w.id === editingWatch.id ? { ...w, ...resData } : w
+          )
+        );
+      } else {
+        // Add watch API request
+        const res = await fetch("/api/admin/products", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        });
+        
+        const resData = await res.json();
+        if (!res.ok) {
+          throw new Error(resData.error || "Failed to create timepiece");
+        }
+
+        setWatches([resData, ...watches]);
+      }
+
+      setIsFormOpen(false);
+    } catch (err: any) {
+      alert(err.message || "Failed to submit product form.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const filteredWatches = watches.filter(
@@ -180,45 +230,53 @@ export default function ProductsClient({ initialWatches }: ProductsClientProps) 
               </tr>
             </thead>
             <tbody>
-              {filteredWatches.map((w) => (
-                <tr key={w.id} className="border-b border-border/50 last:border-0 hover:bg-soft-bg/20 transition-colors">
-                  <td className="p-4 shrink-0">
-                    <img src={w.thumbnailUrl} alt={w.name} className="w-12 h-12 object-cover rounded-lg border border-border" />
-                  </td>
-                  <td className="p-4 font-mono font-bold text-primary-dark">{w.sku}</td>
-                  <td className="p-4 text-text-secondary font-medium">{w.brand}</td>
-                  <td className="p-4 max-w-xs truncate font-bold text-primary-dark" title={w.name}>{w.name}</td>
-                  <td className="p-4 text-right font-bold text-primary-dark">₹{w.price.toLocaleString("en-IN")}</td>
-                  <td className="p-4 text-center font-bold text-text-secondary">{w.stock}</td>
-                  <td className="p-4 text-center">
-                    <span className={`inline-block px-2.5 py-1 rounded-full text-[9px] font-bold uppercase tracking-wider ${
-                      w.status === "ACTIVE"
-                        ? "bg-green-50 text-green-700 border border-green-100"
-                        : "bg-zinc-100 text-zinc-600 border border-zinc-200"
-                    }`}>
-                      {w.status}
-                    </span>
-                  </td>
-                  <td className="p-4">
-                    <div className="flex items-center justify-center gap-2">
-                      <button
-                        onClick={() => handleEditClick(w)}
-                        className="p-2 text-text-muted hover:text-gold-accent transition-colors rounded-lg hover:bg-soft-bg"
-                        aria-label="Edit product"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(w.id)}
-                        className="p-2 text-text-muted hover:text-red-500 transition-colors rounded-lg hover:bg-soft-bg"
-                        aria-label="Delete product"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
+              {filteredWatches.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="p-8 text-center text-text-muted">
+                    No timepieces found matching search criteria.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                filteredWatches.map((w) => (
+                  <tr key={w.id} className="border-b border-border/50 last:border-0 hover:bg-soft-bg/20 transition-colors">
+                    <td className="p-4 shrink-0">
+                      <img src={w.thumbnailUrl} alt={w.name} className="w-12 h-12 object-cover rounded-lg border border-border" />
+                    </td>
+                    <td className="p-4 font-mono font-bold text-primary-dark">{w.sku}</td>
+                    <td className="p-4 text-text-secondary font-medium">{w.brand}</td>
+                    <td className="p-4 max-w-xs truncate font-bold text-primary-dark" title={w.name}>{w.name}</td>
+                    <td className="p-4 text-right font-bold text-primary-dark">₹{w.price.toLocaleString("en-IN")}</td>
+                    <td className="p-4 text-center font-bold text-text-secondary">{w.stock}</td>
+                    <td className="p-4 text-center">
+                      <span className={`inline-block px-2.5 py-1 rounded-full text-[9px] font-bold uppercase tracking-wider ${
+                        w.status === "ACTIVE"
+                          ? "bg-green-50 text-green-700 border border-green-100"
+                          : "bg-zinc-100 text-zinc-600 border border-zinc-200"
+                      }`}>
+                        {w.status}
+                      </span>
+                    </td>
+                    <td className="p-4">
+                      <div className="flex items-center justify-center gap-2">
+                        <button
+                          onClick={() => handleEditClick(w)}
+                          className="p-2 text-text-muted hover:text-gold-accent transition-colors rounded-lg hover:bg-soft-bg"
+                          aria-label="Edit product"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(w.id)}
+                          className="p-2 text-text-muted hover:text-red-500 transition-colors rounded-lg hover:bg-soft-bg"
+                          aria-label="Delete product"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -228,7 +286,7 @@ export default function ProductsClient({ initialWatches }: ProductsClientProps) 
       {isFormOpen && (
         <div className="fixed inset-0 z-50 flex justify-end">
           {/* Overlay backdrop */}
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity duration-300" onClick={() => setIsFormOpen(false)}></div>
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity duration-300" onClick={() => !submitting && setIsFormOpen(false)}></div>
           
           {/* Form container */}
           <div className="relative w-full max-w-xl bg-white shadow-2xl h-full flex flex-col z-10 transition-transform duration-300 animate-slide-in">
@@ -237,7 +295,7 @@ export default function ProductsClient({ initialWatches }: ProductsClientProps) 
               <h3 className="font-heading text-lg tracking-wider uppercase">
                 {editingWatch ? "Edit Timepiece" : "Add Timepiece"}
               </h3>
-              <button onClick={() => setIsFormOpen(false)} className="text-white/60 hover:text-white transition-colors">
+              <button onClick={() => !submitting && setIsFormOpen(false)} className="text-white/60 hover:text-white transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -248,11 +306,11 @@ export default function ProductsClient({ initialWatches }: ProductsClientProps) 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-[10px] uppercase tracking-wider font-bold text-text-muted">SKU Code</label>
-                  <input type="text" required value={sku} onChange={(e) => setSku(e.target.value)} className="w-full bg-soft-bg border border-border px-4 py-2.5 rounded-xl text-xs focus:outline-none" />
+                  <input type="text" required disabled={submitting} value={sku} onChange={(e) => setSku(e.target.value)} className="w-full bg-soft-bg border border-border px-4 py-2.5 rounded-xl text-xs focus:outline-none" />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] uppercase tracking-wider font-bold text-text-muted">Status</label>
-                  <select value={status} onChange={(e) => setStatus(e.target.value)} className="w-full bg-white border border-border px-4 py-2.5 rounded-xl text-xs focus:outline-none">
+                  <label className="text-[10px] uppercase tracking-wider font-bold text-text-muted">SKU Status</label>
+                  <select disabled={submitting} value={status} onChange={(e) => setStatus(e.target.value)} className="w-full bg-white border border-border px-4 py-2.5 rounded-xl text-xs focus:outline-none">
                     <option value="ACTIVE">ACTIVE</option>
                     <option value="DRAFT">DRAFT</option>
                     <option value="OUT_OF_STOCK">OUT OF STOCK</option>
@@ -260,41 +318,58 @@ export default function ProductsClient({ initialWatches }: ProductsClientProps) 
                 </div>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-[10px] uppercase tracking-wider font-bold text-text-muted">Watch Full Name</label>
-                <input type="text" required value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Swatch Rebel Black Watch" className="w-full bg-soft-bg border border-border px-4 py-2.5 rounded-xl text-xs focus:outline-none" />
-              </div>
-
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-[10px] uppercase tracking-wider font-bold text-text-muted">Brand Manufacturer</label>
-                  <input type="text" required value={brand} onChange={(e) => setBrand(e.target.value)} placeholder="e.g. Swatch" className="w-full bg-soft-bg border border-border px-4 py-2.5 rounded-xl text-xs focus:outline-none" />
+                  <label className="text-[10px] uppercase tracking-wider font-bold text-text-muted">Collection Collection</label>
+                  <select
+                    required
+                    disabled={submitting}
+                    value={categoryId}
+                    onChange={(e) => setCategoryId(e.target.value)}
+                    className="w-full bg-white border border-border px-4 py-2.5 rounded-xl text-xs focus:outline-none"
+                  >
+                    <option value="">Select Category</option>
+                    {categories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] uppercase tracking-wider font-bold text-text-muted">Model Reference</label>
-                  <input type="text" required value={model} onChange={(e) => setModel(e.target.value)} placeholder="e.g. SUOB702" className="w-full bg-soft-bg border border-border px-4 py-2.5 rounded-xl text-xs focus:outline-none" />
+                  <input type="text" required disabled={submitting} value={model} onChange={(e) => setModel(e.target.value)} placeholder="e.g. SUOB702" className="w-full bg-soft-bg border border-border px-4 py-2.5 rounded-xl text-xs focus:outline-none" />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] uppercase tracking-wider font-bold text-text-muted">Price (INR)</label>
-                  <input type="number" required min="0" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="6850" className="w-full bg-soft-bg border border-border px-4 py-2.5 rounded-xl text-xs focus:outline-none" />
+              <div className="space-y-1">
+                <label className="text-[10px] uppercase tracking-wider font-bold text-text-muted">Watch Full Name</label>
+                <input type="text" required disabled={submitting} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Swatch Rebel Black Watch" className="w-full bg-soft-bg border border-border px-4 py-2.5 rounded-xl text-xs focus:outline-none" />
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <div className="col-span-1 space-y-1">
+                  <label className="text-[10px] uppercase tracking-wider font-bold text-text-muted">Brand</label>
+                  <input type="text" required disabled={submitting} value={brand} onChange={(e) => setBrand(e.target.value)} placeholder="Swatch" className="w-full bg-soft-bg border border-border px-4 py-2.5 rounded-xl text-xs focus:outline-none" />
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] uppercase tracking-wider font-bold text-text-muted">Initial Stock</label>
-                  <input type="number" required min="0" value={stock} onChange={(e) => setStock(e.target.value)} placeholder="70" className="w-full bg-soft-bg border border-border px-4 py-2.5 rounded-xl text-xs focus:outline-none" />
+                <div className="col-span-1 space-y-1">
+                  <label className="text-[10px] uppercase tracking-wider font-bold text-text-muted">Price (INR)</label>
+                  <input type="number" required min="0" disabled={submitting} value={price} onChange={(e) => setPrice(e.target.value)} placeholder="6850" className="w-full bg-soft-bg border border-border px-4 py-2.5 rounded-xl text-xs focus:outline-none" />
+                </div>
+                <div className="col-span-1 space-y-1">
+                  <label className="text-[10px] uppercase tracking-wider font-bold text-text-muted">Stock Quantity</label>
+                  <input type="number" required min="0" disabled={submitting} value={stock} onChange={(e) => setStock(e.target.value)} placeholder="70" className="w-full bg-soft-bg border border-border px-4 py-2.5 rounded-xl text-xs focus:outline-none" />
                 </div>
               </div>
 
               <div className="space-y-1">
                 <label className="text-[10px] uppercase tracking-wider font-bold text-text-muted">Thumbnail Image URL</label>
-                <input type="url" required value={thumbnailUrl} onChange={(e) => setThumbnailUrl(e.target.value)} className="w-full bg-soft-bg border border-border px-4 py-2.5 rounded-xl text-xs focus:outline-none" />
+                <input type="url" required disabled={submitting} value={thumbnailUrl} onChange={(e) => setThumbnailUrl(e.target.value)} className="w-full bg-soft-bg border border-border px-4 py-2.5 rounded-xl text-xs focus:outline-none" />
               </div>
 
               <div className="space-y-1">
                 <label className="text-[10px] uppercase tracking-wider font-bold text-text-muted">Description Narrative</label>
-                <textarea rows={4} required value={description} onChange={(e) => setDescription(e.target.value)} placeholder="A cool modern monochromatic look..." className="w-full bg-soft-bg border border-border px-4 py-2.5 rounded-xl text-xs focus:outline-none resize-none" />
+                <textarea rows={4} required disabled={submitting} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="A cool modern monochromatic look..." className="w-full bg-soft-bg border border-border px-4 py-2.5 rounded-xl text-xs focus:outline-none resize-none" />
               </div>
 
               <div className="h-px bg-border/60 w-full my-4"></div>
@@ -306,17 +381,17 @@ export default function ProductsClient({ initialWatches }: ProductsClientProps) 
                 
                 <div className="space-y-1">
                   <label className="text-[9px] uppercase tracking-wider font-bold text-text-muted ml-1">Amazon Link</label>
-                  <input type="url" value={amazonUrl} onChange={(e) => setAmazonUrl(e.target.value)} placeholder="https://amazon.in/..." className="w-full bg-soft-bg border border-border px-4 py-2.5 rounded-xl text-xs focus:outline-none" />
+                  <input type="url" disabled={submitting} value={amazonUrl} onChange={(e) => setAmazonUrl(e.target.value)} placeholder="https://amazon.in/..." className="w-full bg-soft-bg border border-border px-4 py-2.5 rounded-xl text-xs focus:outline-none" />
                 </div>
 
                 <div className="space-y-1">
                   <label className="text-[9px] uppercase tracking-wider font-bold text-text-muted ml-1">Flipkart Link</label>
-                  <input type="url" value={flipkartUrl} onChange={(e) => setFlipkartUrl(e.target.value)} placeholder="https://flipkart.com/..." className="w-full bg-soft-bg border border-border px-4 py-2.5 rounded-xl text-xs focus:outline-none" />
+                  <input type="url" disabled={submitting} value={flipkartUrl} onChange={(e) => setFlipkartUrl(e.target.value)} placeholder="https://flipkart.com/..." className="w-full bg-soft-bg border border-border px-4 py-2.5 rounded-xl text-xs focus:outline-none" />
                 </div>
 
                 <div className="space-y-1">
                   <label className="text-[9px] uppercase tracking-wider font-bold text-text-muted ml-1">Meesho Link</label>
-                  <input type="url" value={meeshoUrl} onChange={(e) => setMeeshoUrl(e.target.value)} placeholder="https://meesho.com/..." className="w-full bg-soft-bg border border-border px-4 py-2.5 rounded-xl text-xs focus:outline-none" />
+                  <input type="url" disabled={submitting} value={meeshoUrl} onChange={(e) => setMeeshoUrl(e.target.value)} placeholder="https://meesho.com/..." className="w-full bg-soft-bg border border-border px-4 py-2.5 rounded-xl text-xs focus:outline-none" />
                 </div>
               </div>
 
@@ -324,10 +399,11 @@ export default function ProductsClient({ initialWatches }: ProductsClientProps) 
 
             {/* Footer Form Actions */}
             <div className="absolute bottom-0 left-0 w-full p-6 border-t border-border bg-white flex gap-4">
-              <button type="button" onClick={() => setIsFormOpen(false)} className="w-1/3 btn btn-secondary py-4.5 rounded-xl">
+              <button type="button" disabled={submitting} onClick={() => setIsFormOpen(false)} className="w-1/3 btn btn-secondary py-4.5 rounded-xl">
                 Cancel
               </button>
-              <button type="button" onClick={handleSubmit} className="w-2/3 btn btn-accent py-4.5 rounded-xl">
+              <button type="button" disabled={submitting} onClick={handleSubmit} className="w-2/3 btn btn-accent py-4.5 rounded-xl flex items-center justify-center gap-2">
+                {submitting && <Loader2 className="w-4 h-4 animate-spin text-primary-dark" />}
                 {editingWatch ? "Save Changes" : "Create Product"}
               </button>
             </div>

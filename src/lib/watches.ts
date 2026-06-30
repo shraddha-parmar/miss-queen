@@ -5,7 +5,12 @@ import { MOCK_WATCHES, MOCK_CATEGORIES, MockWatch } from "./mockData";
 export function isUsingMockData(): boolean {
   const url = process.env.DATABASE_URL;
   if (!url) return true;
-  if (url.startsWith("prisma+postgres") || url.includes("localhost")) {
+  if (
+    url.startsWith("prisma+postgres") ||
+    url.includes("localhost") ||
+    url.includes("your_username") ||
+    url.includes("xxxxx")
+  ) {
     return true;
   }
   return false;

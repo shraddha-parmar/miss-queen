@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Users, Search, Shield, UserCheck, Trash2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Users, Search, Shield, Loader2, AlertCircle } from "lucide-react";
 
 interface UserItem {
   id: string;
@@ -12,36 +12,64 @@ interface UserItem {
 }
 
 export default function UsersPage() {
-  const [users, setUsers] = useState<UserItem[]>([
-    { id: "usr-1", name: "Miss Queen Admin", email: "admin@missqueen.com", role: "ADMIN", createdAt: "12 Apr 2026" },
-    { id: "usr-2", name: "John Doe", email: "customer@missqueen.com", role: "CUSTOMER", createdAt: "15 Apr 2026" },
-    { id: "usr-3", name: "Aarav Sharma", email: "aarav@gmail.com", role: "CUSTOMER", createdAt: "24 May 2026" },
-  ]);
-
+  const [users, setUsers] = useState<UserItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
 
-  const handleToggleRole = (id: string) => {
-    setUsers(
-      users.map((u) => {
-        if (u.id === id) {
-          const nextRole = u.role === "ADMIN" ? "CUSTOMER" : "ADMIN";
-          return { ...u, role: nextRole };
-        }
-        return u;
-      })
-    );
+  const fetchUsers = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const res = await fetch("/api/admin/users");
+      if (!res.ok) {
+        throw new Error("Failed to load user registry");
+      }
+      const data = await res.json();
+      setUsers(data);
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || "Failed to load users from vault.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm("Remove user account from Vault database registry?")) {
-      setUsers(users.filter((u) => u.id !== id));
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const handleToggleRole = async (id: string, currentRole: "ADMIN" | "CUSTOMER") => {
+    const nextRole = currentRole === "ADMIN" ? "CUSTOMER" : "ADMIN";
+    
+    if (confirm(`Are you sure you want to change this user's role to ${nextRole}?`)) {
+      try {
+        const res = await fetch(`/api/admin/users/${id}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ role: nextRole }),
+        });
+        
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.error || "Failed to update role");
+        }
+        
+        setUsers(
+          users.map((u) => (u.id === id ? { ...u, role: data.role } : u))
+        );
+      } catch (err: any) {
+        alert(err.message || "Could not toggle user permissions.");
+      }
     }
   };
 
   const filteredUsers = users.filter(
     (u) =>
-      u.name.toLowerCase().includes(search.toLowerCase()) ||
-      u.email.toLowerCase().includes(search.toLowerCase())
+      (u.name || "").toLowerCase().includes(search.toLowerCase()) ||
+      (u.email || "").toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -69,61 +97,81 @@ export default function UsersPage() {
         <Search className="w-4 h-4 text-text-muted absolute left-3.5 top-1/2 -translate-y-1/2" />
       </div>
 
-      {/* Main Table */}
-      <div className="card p-0 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="border-b border-border text-text-muted font-bold uppercase tracking-wider bg-soft-bg/30">
-                <th className="p-4">Name</th>
-                <th className="p-4">Email</th>
-                <th className="p-4 text-center">Dashboard Permissions</th>
-                <th className="p-4 text-center">Action Toggle</th>
-                <th className="p-4 text-right">Registry Date</th>
-                <th className="p-4 text-center">Remove</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredUsers.map((u) => (
-                <tr key={u.id} className="border-b border-border/50 last:border-0 hover:bg-soft-bg/20 transition-colors">
-                  <td className="p-4 font-bold text-primary-dark">{u.name}</td>
-                  <td className="p-4 text-text-secondary font-mono">{u.email}</td>
-                  <td className="p-4 text-center">
-                    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-bold uppercase tracking-wider ${
-                      u.role === "ADMIN"
-                        ? "bg-gold-accent/10 text-gold-accent border border-gold-accent/20"
-                        : "bg-zinc-100 text-zinc-600 border border-zinc-200"
-                    }`}>
-                      {u.role === "ADMIN" && <Shield className="w-3 h-3" />}
-                      {u.role}
-                    </span>
-                  </td>
-                  <td className="p-4 text-center">
-                    <button
-                      onClick={() => handleToggleRole(u.id)}
-                      className="text-gold-accent hover:underline uppercase text-[9px] font-bold tracking-wider"
-                    >
-                      Toggle Role
-                    </button>
-                  </td>
-                  <td className="p-4 text-right text-text-muted">{u.createdAt}</td>
-                  <td className="p-4">
-                    <div className="flex items-center justify-center">
-                      <button
-                        onClick={() => handleDelete(u.id)}
-                        className="p-2 text-text-muted hover:text-red-500 transition-colors rounded-lg hover:bg-soft-bg"
-                        aria-label="Remove user account"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {/* Loading state */}
+      {isLoading && (
+        <div className="flex flex-col items-center justify-center py-20 gap-4 text-text-muted">
+          <Loader2 className="w-8 h-8 animate-spin text-gold-accent" />
+          <span className="text-xs uppercase tracking-widest font-bold">Synchronizing user registry...</span>
         </div>
-      </div>
+      )}
+
+      {/* Error state */}
+      {!isLoading && error && (
+        <div className="card border border-red-200 bg-red-50 text-red-700 flex items-center gap-3 p-6">
+          <AlertCircle className="w-5 h-5 shrink-0" />
+          <div className="text-xs font-medium">{error}</div>
+        </div>
+      )}
+
+      {/* Main Table */}
+      {!isLoading && !error && (
+        <div className="card p-0 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="border-b border-border text-text-muted font-bold uppercase tracking-wider bg-soft-bg/30">
+                  <th className="p-4">Name</th>
+                  <th className="p-4">Email</th>
+                  <th className="p-4 text-center">Dashboard Permissions</th>
+                  <th className="p-4 text-center">Action Toggle</th>
+                  <th className="p-4 text-right">Registry Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredUsers.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="p-8 text-center text-text-muted">
+                      No user accounts found matching your query.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredUsers.map((u) => (
+                    <tr key={u.id} className="border-b border-border/50 last:border-0 hover:bg-soft-bg/20 transition-colors">
+                      <td className="p-4 font-bold text-primary-dark">{u.name || "N/A"}</td>
+                      <td className="p-4 text-text-secondary font-mono">{u.email}</td>
+                      <td className="p-4 text-center">
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-bold uppercase tracking-wider ${
+                          u.role === "ADMIN"
+                            ? "bg-gold-accent/10 text-gold-accent border border-gold-accent/20"
+                            : "bg-zinc-100 text-zinc-600 border border-zinc-200"
+                        }`}>
+                          {u.role === "ADMIN" && <Shield className="w-3 h-3" />}
+                          {u.role}
+                        </span>
+                      </td>
+                      <td className="p-4 text-center">
+                        <button
+                          onClick={() => handleToggleRole(u.id, u.role)}
+                          className="text-gold-accent hover:underline uppercase text-[9px] font-bold tracking-wider"
+                        >
+                          Toggle Role
+                        </button>
+                      </td>
+                      <td className="p-4 text-right text-text-muted">
+                        {new Date(u.createdAt).toLocaleDateString("en-IN", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        })}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
     </div>
   );

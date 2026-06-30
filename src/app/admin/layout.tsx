@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useSession, signOut } from "next-auth/react";
 import {
   LayoutDashboard,
   TrendingUp,
@@ -15,6 +16,7 @@ import {
   User,
   LogOut,
   Bell,
+  Shield,
 } from "lucide-react";
 
 export default function AdminLayout({
@@ -24,6 +26,7 @@ export default function AdminLayout({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const { data: session, status } = useSession();
 
   const menuItems = [
     { name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
@@ -38,12 +41,34 @@ export default function AdminLayout({
     { name: "Profile", href: "/admin/profile", icon: User },
   ];
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await signOut({ redirect: false });
     router.push("/login");
   };
 
   // Determine active page name for breadcrumb
   const currentTab = menuItems.find((item) => pathname === item.href)?.name || "Dashboard";
+
+  // Get user display info
+  const userName = session?.user?.name || "Admin User";
+  const userInitials = userName
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+
+  // Loading state
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen bg-soft-bg flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-10 h-10 border-3 border-gold-accent border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-xs text-text-muted uppercase tracking-widest font-bold">Loading Vault...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-soft-bg flex font-sans">
@@ -112,6 +137,14 @@ export default function AdminLayout({
           </div>
 
           <div className="flex items-center gap-4">
+            {/* Role Badge */}
+            {session?.user?.role === "ADMIN" && (
+              <span className="flex items-center gap-1.5 px-2.5 py-1 bg-gold-accent/10 text-gold-accent text-[9px] font-bold uppercase tracking-wider rounded-full border border-gold-accent/20">
+                <Shield className="w-3 h-3" />
+                Admin
+              </span>
+            )}
+
             {/* Quick Notify */}
             <button className="p-2 text-text-muted hover:text-gold-accent transition-colors relative" aria-label="Notifications">
               <Bell className="w-5 h-5" />
@@ -121,11 +154,16 @@ export default function AdminLayout({
             {/* Admin Avatar */}
             <div className="flex items-center gap-2 border-l border-border pl-4">
               <div className="w-8 h-8 rounded-full bg-gold-accent/15 text-gold-accent font-bold text-xs flex items-center justify-center border border-gold-accent/20 uppercase">
-                MQ
+                {userInitials}
               </div>
-              <span className="text-xs font-semibold text-primary-dark hidden sm:inline-block">
-                Admin User
-              </span>
+              <div className="hidden sm:flex flex-col">
+                <span className="text-xs font-semibold text-primary-dark">
+                  {userName}
+                </span>
+                <span className="text-[9px] text-text-muted">
+                  {session?.user?.email}
+                </span>
+              </div>
             </div>
           </div>
         </header>

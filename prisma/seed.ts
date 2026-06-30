@@ -1,4 +1,5 @@
 import { PrismaClient, Role, ProductStatus } from "@prisma/client";
+import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
@@ -17,11 +18,13 @@ async function main() {
   await prisma.coupon.deleteMany({});
 
   // 1. Create Default Admin & Customer users
+  const hashedPassword = await bcrypt.hash("password123", 12);
+
   const admin = await prisma.user.create({
     data: {
       email: "admin@missqueen.com",
       name: "Miss Queen Admin",
-      password: "password123", // In production, this would be hashed
+      password: hashedPassword,
       role: Role.ADMIN,
     },
   });
@@ -30,7 +33,7 @@ async function main() {
     data: {
       email: "customer@missqueen.com",
       name: "John Doe",
-      password: "password123",
+      password: hashedPassword,
       role: Role.CUSTOMER,
     },
   });
